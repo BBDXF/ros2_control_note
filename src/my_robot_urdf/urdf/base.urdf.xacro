@@ -1,0 +1,189 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+  <!-- 1. 常量定义（方便后续修改尺寸） -->
+  <xacro:property name="base_length" value="0.1" />    <!-- 底座尺寸 -->
+  <xacro:property name="base_height" value="0.3" />    <!-- 底座尺寸 -->
+  <xacro:property name="link_length" value="0.2" />    <!-- 关节连杆长度 -->
+  <xacro:property name="link_radius" value="0.03" />   <!-- 关节连杆半径 -->
+  <xacro:property name="gripper_length" value="0.1" /> <!-- 夹爪长度 -->
+  <xacro:property name="gripper_radius" value="0.02" /><!-- 夹爪半径 -->
+  <xacro:property name="joint_limit" value="${pi/2}" />   <!-- 关节角度限制（±90°） -->
+  <xacro:property name="gripper_limit" value="0.6" />  <!-- 夹爪开合角度限制（0~0.6rad≈34°） -->
+
+  <!-- 2. 机械结构定义（底座+3关节+夹爪，含视觉/碰撞/惯性） -->
+  <link name="map">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+  </link>
+
+  <joint name="map_joint" type="fixed">
+    <parent link="map" />
+    <child link="base_link" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
+  </joint>
+  <!-- 2.1 底座连杆（base_link） -->
+  <link name="base_link">
+    <!-- 视觉模型（灰色立方体） -->
+    <visual>
+      <origin xyz="0 0 ${base_height/2}" rpy="0 0 0" />
+      <geometry>
+        <box size="${base_length} ${base_length} ${base_height}" />
+      </geometry>
+      <material name="gray">
+        <color rgba="0.5 0.5 0.5 1" />
+      </material>
+    </visual>
+    <!-- 碰撞模型（与视觉模型一致，用于碰撞检测） -->
+    <collision>
+      <geometry>
+        <box size="${base_length} ${base_length} ${base_height}" />
+      </geometry>
+    </collision>
+    <!-- 惯性模型（影响动力学仿真） -->
+    <inertial>
+      <mass value="1.0" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01" />
+    </inertial>
+  </link>
+
+  <!-- 2.2 关节1 + 连杆1 -->
+  <joint name="joint1" type="revolute">
+    <parent link="base_link" />
+    <child link="link1" />
+    <origin xyz="0 0 ${base_height}" rpy="0 0 0" /> <!-- 关节1安装在底座顶部中心 -->
+    <axis xyz="0 0 1" /> <!-- 绕Z轴旋转（水平转动） -->
+    <limit lower="-${pi}" upper="${pi}" effort="100" velocity="1.0" />
+  </joint>
+  <link name="link1">
+    <visual>
+      <origin xyz="${link_length/2} 0 0" rpy="0 ${pi/2} 0" /> <!-- 圆柱体沿X轴摆放 -->
+      <geometry>
+        <cylinder length="${link_length}" radius="${link_radius}" />
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="${link_length/2} 0 0" rpy="0 ${pi/2} 0" />
+      <geometry>
+        <cylinder length="${link_length}" radius="${link_radius}" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01" />
+    </inertial>
+  </link>
+
+  <!-- 2.3 关节2 + 连杆2 -->
+  <joint name="joint2" type="revolute">
+    <parent link="link1" />
+    <child link="link2" />
+    <origin xyz="${link_length} 0 0" rpy="0 0 0" /> <!-- 关节2安装在连杆1末端 -->
+    <axis xyz="0 1 0" /> <!-- 绕Y轴旋转（上下摆动） -->
+    <limit lower="-${joint_limit}" upper="${joint_limit}" effort="100" velocity="1.0" />
+  </joint>
+  <link name="link2">
+    <visual>
+      <origin xyz="${link_length/2} 0 0" rpy="0 ${pi/2} 0" />
+      <geometry>
+        <cylinder length="${link_length}" radius="${link_radius}" />
+      </geometry>
+      <material name="green">
+        <color rgba="0 1 0 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="${link_length/2} 0 0" rpy="0 ${pi/2} 0" />
+      <geometry>
+        <cylinder length="${link_length}" radius="${link_radius}" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5" />
+      <inertia ixx="0.01" ixy="0.0" ixz="0.0" iyy="0.01" iyz="0.0" izz="0.01" />
+    </inertial>
+  </link>
+
+  <!-- 2.4 关节3 + 连杆3 -->
+  <joint name="joint3" type="revolute">
+    <parent link="link2" />
+    <child link="link3" />
+    <origin xyz="${link_length} 0 0" rpy="0 0 0" /> <!-- 关节3安装在连杆2末端 -->
+    <axis xyz="0 1 0" /> <!-- 绕Y轴旋转（上下摆动，与关节2协同调整姿态） -->
+    <limit lower="-${joint_limit}" upper="${joint_limit}" effort="100" velocity="1.0" />
+  </joint>
+  <link name="link3">
+    <visual>
+      <origin xyz="${link_length/2} 0 0" rpy="0 ${pi/2} 0" />
+      <geometry>
+        <cylinder length="${link_length}" radius="${link_radius}" />
+      </geometry>
+      <material name="red">
+        <color rgba="1 0 0 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="${link_length/2} 0 0" rpy="0 ${pi/2} 0" />
+      <geometry>
+        <cylinder length="${link_length}" radius="${link_radius}" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.3" />
+      <inertia ixx="0.005" ixy="0.0" ixz="0.0" iyy="0.005" iyz="0.0" izz="0.005" />
+    </inertial>
+  </link>
+
+  <!-- 2.5 夹爪关节 + 夹爪连杆（两指简化为单指，核心是控制接口） -->
+  <joint name="gripper_joint" type="revolute">
+    <parent link="link3" />
+    <child link="gripper_link" />
+    <origin xyz="${link_length} 0 0" rpy="0 0 0" /> <!-- 夹爪安装在连杆3末端 -->
+    <axis xyz="0 1 0" /> <!-- 绕Y轴旋转（实现开合） -->
+    <limit lower="0.0" upper="${gripper_limit}" effort="50" velocity="0.3" /> <!-- 开合角度限制 -->
+  </joint>
+  <link name="gripper_link">
+    <visual>
+      <origin xyz="${gripper_length/2} 0 0" rpy="0 ${pi/2} 0" />
+      <geometry>
+        <cylinder length="${gripper_length}" radius="${gripper_radius}" />
+      </geometry>
+      <material name="orange">
+        <color rgba="1 0.5 0 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="${gripper_length/2} 0 0" rpy="0 ${pi/2} 0" />
+      <geometry>
+        <cylinder length="${gripper_length}" radius="${gripper_radius}" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.1" /> <!-- 夹爪质量较轻 -->
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001" />
+    </inertial>
+  </link>
+
+  <!-- 在你的URDF机械结构定义部分添加 -->
+  <link name="gpio_estop_link">
+    <!-- 这是一个虚拟连杆，不需要物理外观 -->
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.01" /> <!-- 一个极小的立方体，几乎不可见 -->
+      </geometry>
+      <material name="transparent">
+        <color rgba="0 0 0 0" /> <!-- 完全透明 -->
+      </material>
+    </visual>
+  </link>
+
+  <joint name="gpio_estop" type="revolute">
+    <parent link="base_link" />
+    <child link="gpio_estop_link" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <axis xyz="0 1 0" /> <!-- 绕Y轴旋转（上下摆动，与关节2协同调整姿态） -->
+    <limit lower="-${joint_limit}" upper="${joint_limit}" effort="100" velocity="1.0" />
+  </joint>
+
+</robot>

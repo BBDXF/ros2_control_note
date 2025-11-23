@@ -1,0 +1,5 @@
+<library path="my_hardware_controller">
+  <class name="my_robot_urdf/MyHardwareController" type="my_robot_urdf::MyHardwareController" base_class_type="hardware_interface::SystemInterface">
+    <description>模拟3关节机械臂的硬件接口</description>
+  </class>
+</library>

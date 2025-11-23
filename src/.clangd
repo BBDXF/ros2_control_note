@@ -1,0 +1,22 @@
+CompileFlags:
+    Remove: [-march=*, -mabi=*]
+
+Diagnostics:
+  # 禁用未使用头文件的警告，这在ROS2项目中很常见
+  UnusedIncludes: None
+  ClangTidy:
+    Add: 
+      - "performance-*"
+      - "modernize-*"
+      - "cppcoreguidelines-*"
+    Remove: 
+      - "cert-err58-cpp"  # 避免关于静态变量初始化的警告
+
+# 启用更详细的代码补全
+Completion:
+  AllScopes: true
+
+
+# 后台索引以提高性能
+Index:
+  Background: Build

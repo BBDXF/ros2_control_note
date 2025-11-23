@@ -1,0 +1,10 @@
+---
+Language: Cpp
+BasedOnStyle: Microsoft #Google
+
+# 基本设置
+ColumnLimit: 180  # 行最大长度
+Standard: Auto
+TabWidth: 4
+UseTab: Never
+
