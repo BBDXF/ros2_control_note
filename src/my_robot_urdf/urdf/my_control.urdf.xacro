@@ -24,16 +24,10 @@
       <state_interface name="velocity" />
     </joint>
 
-    <!-- 3.2 夹爪控制接口（Position类型，支持开合角度调节，适配多数场景） -->
-    <gpio name="gripper_joint">
-      <command_interface name="position" /> <!-- 夹爪开合角度指令（0=开，0.6=合） -->
-      <state_interface name="position" />   <!-- 夹爪当前角度反馈 -->
-    </gpio>
-
     <!-- 可选：添加安全接口（GPIO急停/限位，复用之前的配置） -->
-    <gpio name="gpio_estop">
-      <state_interface name="digital" />
-      <command_interface name="digital" />
+    <gpio name="gpio_test">
+      <state_interface name="emstop_output" />
+      <command_interface name="emstop_input" />
     </gpio>
   </ros2_control>
 </robot>

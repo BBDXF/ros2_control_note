@@ -136,12 +136,12 @@
   </link>
 
   <!-- 2.5 夹爪关节 + 夹爪连杆（两指简化为单指，核心是控制接口） -->
-  <joint name="gripper_joint" type="revolute">
+  <!-- <joint name="gripper_joint" type="revolute">
     <parent link="link3" />
     <child link="gripper_link" />
-    <origin xyz="${link_length} 0 0" rpy="0 0 0" /> <!-- 夹爪安装在连杆3末端 -->
-    <axis xyz="0 1 0" /> <!-- 绕Y轴旋转（实现开合） -->
-    <limit lower="0.0" upper="${gripper_limit}" effort="50" velocity="0.3" /> <!-- 开合角度限制 -->
+    <origin xyz="${link_length} 0 0" rpy="0 0 0" /> 
+    <axis xyz="0 1 0" /> 
+    <limit lower="0.0" upper="${gripper_limit}" effort="50" velocity="0.3" /> 
   </joint>
   <link name="gripper_link">
     <visual>
@@ -160,20 +160,19 @@
       </geometry>
     </collision>
     <inertial>
-      <mass value="0.1" /> <!-- 夹爪质量较轻 -->
+      <mass value="0.1" /> 
       <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001" />
     </inertial>
-  </link>
+  </link> -->
 
   <!-- 在你的URDF机械结构定义部分添加 -->
-  <link name="gpio_estop_link">
-    <!-- 这是一个虚拟连杆，不需要物理外观 -->
+  <!-- <link name="gpio_estop_link">
     <visual>
       <geometry>
-        <box size="0.01 0.01 0.01" /> <!-- 一个极小的立方体，几乎不可见 -->
+        <box size="0.01 0.01 0.01" />
       </geometry>
       <material name="transparent">
-        <color rgba="0 0 0 0" /> <!-- 完全透明 -->
+        <color rgba="0 0 0 0" /> 
       </material>
     </visual>
   </link>
@@ -182,8 +181,8 @@
     <parent link="base_link" />
     <child link="gpio_estop_link" />
     <origin xyz="0 0 0" rpy="0 0 0" />
-    <axis xyz="0 1 0" /> <!-- 绕Y轴旋转（上下摆动，与关节2协同调整姿态） -->
+    <axis xyz="0 1 0" />
     <limit lower="-${joint_limit}" upper="${joint_limit}" effort="100" velocity="1.0" />
-  </joint>
+  </joint> -->
 
 </robot>

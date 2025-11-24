@@ -19,10 +19,10 @@ def generate_launch_description():
         executable="robot_state_publisher",
         parameters=[{"robot_description": robot_description}],
     )
-    joint_state_publisher_node = Node(
-        package="joint_state_publisher_gui",
-        executable="joint_state_publisher_gui",
-    )
+    # joint_state_publisher_node = Node(
+    #     package="joint_state_publisher_gui",
+    #     executable="joint_state_publisher_gui",
+    # )
 
     # 5. RViz节点
     rviz_node = Node(
@@ -37,6 +37,6 @@ def generate_launch_description():
     # 7. 启动所有节点
     return LaunchDescription([
         robot_state_publisher_node,
-        joint_state_publisher_node,
+        # joint_state_publisher_node,
         rviz_node
     ])

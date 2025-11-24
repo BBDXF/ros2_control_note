@@ -1,29 +1,33 @@
 controller_manager:
   ros__parameters:
-    update_rate: 10
-    # 1. 关节组控制器（控制3个机械臂关节，支持单关节/多关节控制）
-    arm_group_controller:
-      type: position_controllers/JointGroupPositionController
-    # 2. 夹爪单独控制器（避免与关节冲突，推荐）
-    gripper_controller:
-      type: position_controllers/JointPositionController
-    # 3. 关节状态控制器（读取所有接口状态）
-    joint_state_controller:
-      type: joint_state_controller/JointStateController
+    update_rate: 10 # Hz
 
-# 机械臂关节组配置（支持单关节/多关节控制）
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
 arm_group_controller:
   ros__parameters:
-    joints: [joint1, joint2, joint3]  # 包含所有关节
+    type: position_controllers/JointGroupPositionController
+    joints: 
+      - joint1
+      - joint2
+      - joint3
     interface_name: position
     goal_tolerance: 0.01
     allow_partial_joint_goal: true    # 允许仅指定部分关节发送指令
 
-# 夹爪控制器配置
-gripper_controller:
+gpio_controller:
   ros__parameters:
-    joint: gripper_joint
-    interface_name: position
-    goal_tolerance: 0.005  # 夹爪精度要求更高，容差更小
+    type: gpio_controllers/GpioCommandController
+    gpios:
+      - gpio_test
+    command_interfaces:
+      gpio_estop:
+        - interfaces:
+          - emstop_input
+    state_interfaces:
+      gpio_estop:
+        - interfaces:
+          - emstop_output
 
-# 可选：GPIO急停无需额外控制器，由joint_state_controller读取
+

@@ -1,9 +1,33 @@
-// my_hardware_controller.cpp
+// Copyright 2023 ros2_control Development Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include "hardware_interface/system_interface.hpp"
-#include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include <string>
+#include <chrono>
+#include <cmath>
+#include <iomanip>
+#include <limits>
+#include <memory>
+#include <sstream>
 #include <vector>
+#include "hardware_interface/handle.hpp"
+#include "hardware_interface/hardware_info.hpp"
+#include "hardware_interface/system_interface.hpp"
+#include "hardware_interface/types/hardware_interface_return_values.hpp"
+#include "rclcpp/macros.hpp"
+#include "rclcpp_lifecycle/node_interfaces/lifecycle_node_interface.hpp"
+#include "rclcpp_lifecycle/state.hpp"
 
 namespace my_robot_urdf
 {
@@ -11,149 +35,192 @@ namespace my_robot_urdf
 class MyHardwareController : public hardware_interface::SystemInterface
 {
   public:
-    hardware_interface::CallbackReturn on_init(const hardware_interface::HardwareInfo &info) override
+    hardware_interface::CallbackReturn on_init(const hardware_interface::HardwareComponentInterfaceParams &params) override
     {
-        // 调用基类初始化
-        if (hardware_interface::SystemInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS)
+        if (hardware_interface::SystemInterface::on_init(params) != hardware_interface::CallbackReturn::SUCCESS)
         {
             return hardware_interface::CallbackReturn::ERROR;
         }
 
-        try
-        {
-            // 根据硬件类型初始化相应的接口
-            if (info_.type == "actuator")
-            {
-                // 初始化执行器特定的数据结构
-                RCLCPP_INFO(logger_, "Initializing actuator hardware component: %s", info_.name.c_str());
-            }
-            else if (info_.type == "sensor")
-            {
-                // 初始化传感器特定的数据结构
-                RCLCPP_INFO(logger_, "Initializing sensor hardware component: %s", info_.name.c_str());
-            }
-            else if (info_.type == "system")
-            {
-                // 初始化系统特定的数据结构
-                RCLCPP_INFO(logger_, "Initializing system hardware component: %s", info_.name.c_str());
-            }
-
-            // 初始化关节状态（位置、速度）
-            joint_positions_.resize(info_.joints.size(), 0.0);
-            joint_velocities_.resize(info_.joints.size(), 0.0);
-            joint_commands_.resize(info_.joints.size(), 0.0);
-
-            // 初始化GPIO状态
-            gpio_states_.resize(info_.gpios.size(), 0.0);
-            gpio_commands_.resize(info_.gpios.size(), 0.0);
-
-            return hardware_interface::CallbackReturn::SUCCESS;
-        }
-        catch (const std::exception &e)
-        {
-            RCLCPP_ERROR(logger_, "Failed to initialize hardware component: %s", e.what());
-            return hardware_interface::CallbackReturn::ERROR;
-        }
+        return hardware_interface::CallbackReturn::SUCCESS;
     }
 
-    std::vector<hardware_interface::StateInterface> export_state_interfaces() override
+    hardware_interface::CallbackReturn on_configure(const rclcpp_lifecycle::State & /*previous_state*/) override
     {
-        std::vector<hardware_interface::StateInterface> state_interfaces;
-        for (size_t i = 0; i < info_.joints.size(); i++)
-        {
-            // 位置状态接口
-            state_interfaces.emplace_back(hardware_interface::StateInterface(info_.joints[i].name, hardware_interface::HW_IF_POSITION, &joint_positions_[i]));
+        RCLCPP_INFO(logger_, "Configuring ...please wait...");
 
-            // 速度状态接口
-            state_interfaces.emplace_back(hardware_interface::StateInterface(info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &joint_velocities_[i]));
+        // 配置时重置所有值
+        for (const auto &[name, descr] : joint_state_interfaces_)
+        {
+            set_state(name, 0.0);
+        }
+        for (const auto &[name, descr] : joint_command_interfaces_)
+        {
+            set_command(name, 0.0);
+        }
+        for (const auto &[name, descr] : gpio_state_interfaces_)
+        {
+            set_state(name, 0.0);
+        }
+        for (const auto &[name, descr] : gpio_command_interfaces_)
+        {
+            set_command(name, 0.0);
         }
 
-        // 添加GPIO状态接口
-        for (size_t i = 0; i < info_.gpios.size(); i++)
-        {
-            state_interfaces.emplace_back(hardware_interface::StateInterface(info_.gpios[i].name, "digital", &gpio_states_[i]));
-        }
-        return state_interfaces;
+        RCLCPP_INFO(logger_, "Successfully configured!");
+
+        return hardware_interface::CallbackReturn::SUCCESS;
     }
 
-    std::vector<hardware_interface::CommandInterface> export_command_interfaces() override
+    hardware_interface::CallbackReturn on_activate(const rclcpp_lifecycle::State & /*previous_state*/) override
     {
-        std::vector<hardware_interface::CommandInterface> command_interfaces;
-        for (size_t i = 0; i < info_.joints.size(); i++)
-        {
-            command_interfaces.emplace_back(hardware_interface::CommandInterface(info_.joints[i].name, hardware_interface::HW_IF_POSITION, &joint_commands_[i]));
-        }
+        RCLCPP_INFO(logger_, "Activating ...please wait...");
 
-        // 添加GPIO命令接口
-        for (size_t i = 0; i < info_.gpios.size(); i++)
-        {
-            command_interfaces.emplace_back(hardware_interface::CommandInterface(info_.gpios[i].name, "digital", &gpio_commands_[i]));
-        }
-        return command_interfaces;
+        // 启动时命令和状态应相等
+        // for (const auto &[name, descr] : joint_state_interfaces_)
+        // {
+        //     set_command(name, get_state(name));
+        // }
+        // for (const auto &[name, descr] : gpio_command_interfaces_)
+        // {
+        //     set_command(name, get_state(name));
+        // }
+
+        RCLCPP_INFO(logger_, "Successfully activated!");
+
+        return hardware_interface::CallbackReturn::SUCCESS;
     }
 
-    // 修复：更改 read 方法的返回类型为 return_type
-    hardware_interface::return_type read(const rclcpp::Time &time, const rclcpp::Duration &period) override
+    hardware_interface::CallbackReturn on_deactivate(const rclcpp_lifecycle::State & /*previous_state*/) override
     {
-        // 从硬件读取数据并更新状态接口
-        try
-        {
-            // 实现读取硬件状态的逻辑
-            // 示例: 更新位置、速度等状态值
-            for (size_t i = 0; i < joint_positions_.size(); i++)
-            {
-                // 简单模拟：位置向命令值移动（速度限制为0.5 rad/s）
-                double error = joint_commands_[i] - joint_positions_[i];
-                double max_step = 0.5 * period.seconds(); // 最大步长
-                joint_positions_[i] += std::clamp(error, -max_step, max_step);
+        RCLCPP_INFO(logger_, "Successfully deactivated!");
 
-                // 计算速度（位置变化/时间）
-                joint_velocities_[i] = error / period.seconds();
-            }
-
-            // 模拟GPIO输入状态更新
-            for (size_t i = 0; i < gpio_states_.size(); i++)
-            {
-                gpio_states_[i] = gpio_commands_[i]; // 回读GPIO命令值作为状态
-            }
-
-            return hardware_interface::return_type::OK;
-        }
-        catch (const std::exception &e)
-        {
-            RCLCPP_ERROR(logger_, "Failed to read from hardware: %s", e.what());
-            return hardware_interface::return_type::ERROR;
-        }
+        return hardware_interface::CallbackReturn::SUCCESS;
     }
 
-    // 修复：更改 on_write 方法名称为 write 并修改返回类型为 return_type
-    hardware_interface::return_type write(const rclcpp::Time &time, const rclcpp::Duration &period) override
-    {
-        // 将命令接口的值写入硬件
-        try
-        {
-            // 实现向硬件写入命令的逻辑
-            // 示例: 发送位置、速度等命令到硬件
-            // 在这个模拟中不需要额外操作，命令已在on_read中使用
+    // std::vector<hardware_interface::StateInterface> export_state_interfaces() override
+    // {
+    //     std::vector<hardware_interface::StateInterface> state_interfaces;
 
-            return hardware_interface::return_type::OK;
-        }
-        catch (const std::exception &e)
+    //     for (const auto &joint : info_.joints)
+    //     {
+    //         for (const auto &state_interface : joint.state_interfaces)
+    //         {
+    //             state_interfaces.emplace_back(
+    //                 hardware_interface::StateInterface(joint.name, state_interface.name, &joint_state_interfaces_[joint.name + "/" + state_interface.name]));
+    //         }
+    //     }
+
+    //     for (const auto &gpio : info_.gpios)
+    //     {
+    //         for (const auto &state_interface : gpio.state_interfaces)
+    //         {
+    //             state_interfaces.emplace_back(hardware_interface::StateInterface(gpio.name, state_interface.name, &gpio_state_interfaces_[gpio.name + "/" + state_interface.name]));
+    //         }
+    //     }
+
+    //     return state_interfaces;
+    // }
+
+    // std::vector<hardware_interface::CommandInterface> export_command_interfaces() override
+    // {
+    //     std::vector<hardware_interface::CommandInterface> command_interfaces;
+
+    //     for (const auto &joint : info_.joints)
+    //     {
+    //         for (const auto &command_interface : joint.command_interfaces)
+    //         {
+    //             command_interfaces.emplace_back(
+    //                 hardware_interface::CommandInterface(joint.name, command_interface.name, &joint_command_interfaces_[joint.name + "/" + command_interface.name]));
+    //         }
+    //     }
+
+    //     for (const auto &gpio : info_.gpios)
+    //     {
+    //         for (const auto &command_interface : gpio.command_interfaces)
+    //         {
+    //             command_interfaces.emplace_back(
+    //                 hardware_interface::CommandInterface(gpio.name, command_interface.name, &gpio_command_interfaces_[gpio.name + "/" + command_interface.name]));
+    //         }
+    //     }
+
+    //     return command_interfaces;
+    // }
+
+    hardware_interface::return_type read(const rclcpp::Time & /*time*/, const rclcpp::Duration &period) override
+    {
+        std::stringstream ss;
+        ss << "Reading states:";
+
+        // 模拟关节运动
+        for (const auto &joint : info_.joints)
         {
-            RCLCPP_ERROR(logger_, "Failed to write to hardware: %s", e.what());
-            return hardware_interface::return_type::ERROR;
+            const std::string pos_state_name = joint.name + "/" + hardware_interface::HW_IF_POSITION;
+            const std::string vel_state_name = joint.name + "/" + hardware_interface::HW_IF_VELOCITY;
+            const std::string pos_cmd_name = joint.name + "/" + hardware_interface::HW_IF_POSITION;
+
+            // 更新位置状态
+            double new_pos = get_state(pos_state_name) + (get_command(pos_cmd_name) - get_state(pos_state_name)) / hw_slowdown_;
+            set_state(pos_state_name, new_pos);
+
+            // 计算并更新速度状态
+            double velocity = (get_command(pos_cmd_name) - get_state(pos_state_name)) / period.seconds();
+            set_state(vel_state_name, velocity);
+
+            ss << std::fixed << std::setprecision(2) << std::endl << "\t" << get_state(pos_state_name) << " for joint '" << joint.name << "'";
         }
+
+        // 模拟GPIO输入
+        // 模拟数字输入
+        unsigned int seed = static_cast<unsigned int>(time(NULL)) + 1;
+        const std::string digital_input_name = info_.gpios[0].name + "/" + info_.gpios[0].state_interfaces[0].name;
+        set_state(digital_input_name, static_cast<double>(rand_r(&seed) % 2));
+
+        // 模拟模拟输入
+        seed = static_cast<unsigned int>(time(NULL)) + 2;
+        const std::string analog_input_name = info_.gpios[0].name + "/" + info_.gpios[0].state_interfaces[1].name;
+        set_state(analog_input_name, static_cast<double>(rand_r(&seed) % 1000) / 1000.0);
+
+        // 回读GPIO输出作为输入
+        for (size_t i = 0; i < info_.gpios[1].state_interfaces.size(); i++)
+        {
+            const std::string state_name = info_.gpios[1].name + "/" + info_.gpios[1].state_interfaces[i].name;
+            const std::string cmd_name = info_.gpios[1].name + "/" + info_.gpios[1].command_interfaces[i].name;
+            set_state(state_name, get_command(cmd_name));
+
+            ss << std::fixed << std::setprecision(2) << std::endl << "\t" << get_state(state_name) << " from GPIO input '" << state_name << "'";
+        }
+
+        RCLCPP_INFO_STREAM_THROTTLE(logger_, *get_clock(), 500, ss.str());
+
+        return hardware_interface::return_type::OK;
+    }
+
+    hardware_interface::return_type write(const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/) override
+    {
+        std::stringstream ss;
+        ss << "Writing commands:";
+
+        // 模拟发送命令到硬件
+        for (const auto &[name, descr] : gpio_command_interfaces_)
+        {
+            // 模拟发送命令到硬件
+            ss << std::fixed << std::setprecision(2) << std::endl << "\t" << get_command(name) << " for GPIO output '" << name << "'";
+        }
+
+        for (const auto &[name, descr] : joint_command_interfaces_)
+        {
+            ss << std::fixed << std::setprecision(2) << std::endl << "\t" << get_command(name) << " for joint '" << name.substr(0, name.find("/")) << "'";
+        }
+
+        RCLCPP_INFO_STREAM_THROTTLE(logger_, *get_clock(), 500, ss.str());
+
+        return hardware_interface::return_type::OK;
     }
 
   private:
-    // 关节状态变量
-    std::vector<double> joint_positions_;  // 关节当前位置
-    std::vector<double> joint_velocities_; // 关节当前速度
-    std::vector<double> joint_commands_;   // 关节目标位置命令
-    // GPIO状态变量
-    std::vector<double> gpio_states_;  // GPIO当前状态
-    std::vector<double> gpio_commands_; // GPIO目标状态命令
-
+    // 硬件减速因子
+    double hw_slowdown_ = 50.0; // 模拟硬件响应延迟
     rclcpp::Logger logger_ = rclcpp::get_logger("MyHardwareController");
 };
 

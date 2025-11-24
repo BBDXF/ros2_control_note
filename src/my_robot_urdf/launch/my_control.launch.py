@@ -19,9 +19,14 @@ def generate_launch_description():
         executable="robot_state_publisher",
         parameters=[{"robot_description": robot_description}],
     )
-    joint_state_publisher_node = Node(
-        package="joint_state_publisher_gui",
-        executable="joint_state_publisher_gui",
+    # joint_state_publisher_node = Node(
+    #     package="joint_state_publisher_gui",
+    #     executable="joint_state_publisher_gui",
+    # )
+    joint_state_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_state_broadcaster"],
     )
 
     controller_manager_node = Node(
@@ -76,11 +81,12 @@ def generate_launch_description():
     # 7. 启动所有节点
     return LaunchDescription([
         controller_manager_node,
-        joint_state_publisher_node,
         robot_state_publisher_node,
         joint_state_controller_spawner,
         arm_group_controller_spawner,
         gripper_controller_spawner,
+        # joint_state_publisher_node,
+        joint_state_broadcaster_spawner,
         rviz_node,
         exit_event_handler
     ])
