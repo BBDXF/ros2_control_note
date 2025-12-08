@@ -40,7 +40,7 @@ class MyHardwareController : public hardware_interface::SystemInterface
         hw_commands_velocities_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
         control_level_.resize(info_.joints.size(), integration_level_t::POSITION);
 
-        RCLCPP_DEBUG(get_logger(), "on_init, info_.joints.size() = %d", info_.joints.size());
+        RCLCPP_WARN(get_logger(), "on_init, info_.joints.size() = %d", info_.joints.size());
 
         return hardware_interface::CallbackReturn::SUCCESS;
     }
@@ -50,7 +50,7 @@ class MyHardwareController : public hardware_interface::SystemInterface
         std::vector<hardware_interface::StateInterface> state_interfaces;
         for (std::size_t i = 0; i < info_.joints.size(); i++)
         {
-            RCLCPP_DEBUG(get_logger(), "export_state_interfaces, export state: %d, %s", i, info_.joints[i].name.c_str());
+            RCLCPP_WARN(get_logger(), "export_state_interfaces, export state: %d, %s", i, info_.joints[i].name.c_str());
             state_interfaces.emplace_back(hardware_interface::StateInterface(info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_states_positions_[i]));
             state_interfaces.emplace_back(hardware_interface::StateInterface(info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &hw_states_velocities_[i]));
         }
@@ -63,7 +63,7 @@ class MyHardwareController : public hardware_interface::SystemInterface
         std::vector<hardware_interface::CommandInterface> command_interfaces;
         for (std::size_t i = 0; i < info_.joints.size(); i++)
         {
-            RCLCPP_DEBUG(get_logger(), "export_command_interfaces, export command: %d, %s", i, info_.joints[i].name.c_str());
+            RCLCPP_WARN(get_logger(), "export_command_interfaces, export command: %d, %s", i, info_.joints[i].name.c_str());
             command_interfaces.emplace_back(hardware_interface::CommandInterface(info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_commands_positions_[i]));
             command_interfaces.emplace_back(hardware_interface::CommandInterface(info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &hw_commands_velocities_[i]));
         }
@@ -73,10 +73,12 @@ class MyHardwareController : public hardware_interface::SystemInterface
 
     hardware_interface::return_type prepare_command_mode_switch(const std::vector<std::string> &start_interfaces, const std::vector<std::string> &stop_interfaces) override
     {
+        RCLCPP_WARN(get_logger(), "prepare_command_mode_switch");
         // Prepare for new command modes
         std::vector<integration_level_t> new_modes = {};
         for (std::string key : start_interfaces)
         {
+            RCLCPP_WARN(get_logger(), "prepare_command_mode_switch, prepare command: %s", key.c_str());
             for (std::size_t i = 0; i < info_.joints.size(); i++)
             {
                 if (key == info_.joints[i].name + "/" + hardware_interface::HW_IF_POSITION)
@@ -93,6 +95,7 @@ class MyHardwareController : public hardware_interface::SystemInterface
                 }
             }
         }
+        
         // Example criteria: All joints must be given new command mode at the same time
         if (new_modes.size() != info_.joints.size())
         {
@@ -131,7 +134,7 @@ class MyHardwareController : public hardware_interface::SystemInterface
 
     hardware_interface::CallbackReturn on_activate(const rclcpp_lifecycle::State &previous_state) override
     {
-        RCLCPP_DEBUG(get_logger(), "on_activate ...");
+        RCLCPP_WARN(get_logger(), "on_activate ...");
 
         // Set some default values
         for (std::size_t i = 0; i < hw_states_positions_.size(); i++)
@@ -150,7 +153,7 @@ class MyHardwareController : public hardware_interface::SystemInterface
 
     hardware_interface::CallbackReturn on_deactivate(const rclcpp_lifecycle::State &previous_state) override
     {
-        RCLCPP_DEBUG(get_logger(), "on_deactivate ...");
+        RCLCPP_WARN(get_logger(), "on_deactivate ...");
         return hardware_interface::CallbackReturn::SUCCESS;
     }
 
@@ -172,7 +175,7 @@ class MyHardwareController : public hardware_interface::SystemInterface
             //     default:
             //         break;
 
-            RCLCPP_DEBUG(get_logger(), "read. [%d] control_level: %d, pos state: %.2f, pos command: %.2f...", i, control_level_[i], hw_states_positions_[i],
+            RCLCPP_WARN(get_logger(), "read. [%d] control_level: %d, pos state: %.2f, pos command: %.2f...", i, control_level_[i], hw_states_positions_[i],
                          hw_commands_positions_[i]);
         }
 
@@ -183,8 +186,10 @@ class MyHardwareController : public hardware_interface::SystemInterface
     {
         for (std::size_t i = 0; i < hw_commands_positions_.size(); i++)
         {
-            RCLCPP_DEBUG(get_logger(), "write. [%d] control_level: %d, pos state: %.2f, pos command: %.2f...", i, control_level_[i], hw_states_positions_[i],
+            RCLCPP_WARN(get_logger(), "write. [%d] control_level: %d, pos state: %.2f, pos command: %.2f...", i, control_level_[i], hw_states_positions_[i],
                          hw_commands_positions_[i]);
+            hw_states_positions_[i] = hw_commands_positions_[i];
+            hw_states_velocities_[i] = (hw_commands_positions_[i] - hw_states_positions_[i])/10;
         }
         return hardware_interface::return_type::OK;
     }

@@ -19,7 +19,7 @@ def generate_launch_description():
         executable="robot_state_publisher",
         parameters=[{"robot_description": robot_description}],
     )
-    # joint_state_publisher_node = Node(
+    # joint_state_publisher_gui_node = Node(
     #     package="joint_state_publisher_gui",
     #     executable="joint_state_publisher_gui",
     # )
@@ -38,24 +38,11 @@ def generate_launch_description():
         ],
     )
 
-    joint_state_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["joint_state_controller", "--controller-manager", "/controller_manager"],
-    )
-
     # 3. 关节组控制器（支持单/多关节控制）
     arm_group_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=["arm_group_controller", "--controller-manager", "/controller_manager"],
-    )
-
-    # 4. 夹爪控制器
-    gripper_controller_spawner = Node(
-        package="controller_manager",
-        executable="spawner",
-        arguments=["gripper_controller", "--controller-manager", "/controller_manager"],
     )
 
     # 5. RViz节点
@@ -72,7 +59,6 @@ def generate_launch_description():
             target_action=rviz_node,
             on_exit=[
                 Node(package="controller_manager", executable="unspawner", arguments=["arm_group_controller", "--controller-manager", "/controller_manager"]),
-                Node(package="controller_manager", executable="unspawner", arguments=["gripper_controller", "--controller-manager", "/controller_manager"]),
                 Node(package="controller_manager", executable="unspawner", arguments=["joint_state_controller", "--controller-manager", "/controller_manager"]),
             ],
         )
@@ -82,10 +68,8 @@ def generate_launch_description():
     return LaunchDescription([
         controller_manager_node,
         robot_state_publisher_node,
-        joint_state_controller_spawner,
         arm_group_controller_spawner,
-        gripper_controller_spawner,
-        # joint_state_publisher_node,
+        # joint_state_publisher_gui_node,
         joint_state_broadcaster_spawner,
         rviz_node,
         exit_event_handler
