@@ -38,7 +38,6 @@ class MyHardwareController : public hardware_interface::SystemInterface
         hw_states_velocities_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
         hw_commands_positions_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
         hw_commands_velocities_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
-        control_level_.resize(info_.joints.size(), integration_level_t::POSITION);
 
         RCLCPP_WARN(get_logger(), "on_init, info_.joints.size() = %d", info_.joints.size());
 
@@ -71,67 +70,6 @@ class MyHardwareController : public hardware_interface::SystemInterface
         return command_interfaces;
     }
 
-    hardware_interface::return_type prepare_command_mode_switch(const std::vector<std::string> &start_interfaces, const std::vector<std::string> &stop_interfaces) override
-    {
-        RCLCPP_WARN(get_logger(), "prepare_command_mode_switch");
-        // Prepare for new command modes
-        std::vector<integration_level_t> new_modes = {};
-        for (std::string key : start_interfaces)
-        {
-            RCLCPP_WARN(get_logger(), "prepare_command_mode_switch, prepare command: %s", key.c_str());
-            for (std::size_t i = 0; i < info_.joints.size(); i++)
-            {
-                if (key == info_.joints[i].name + "/" + hardware_interface::HW_IF_POSITION)
-                {
-                    new_modes.push_back(integration_level_t::POSITION);
-                }
-                if (key == info_.joints[i].name + "/" + hardware_interface::HW_IF_VELOCITY)
-                {
-                    new_modes.push_back(integration_level_t::VELOCITY);
-                }
-                if (key == info_.joints[i].name + "/" + hardware_interface::HW_IF_ACCELERATION)
-                {
-                    new_modes.push_back(integration_level_t::ACCELERATION);
-                }
-            }
-        }
-        
-        // Example criteria: All joints must be given new command mode at the same time
-        if (new_modes.size() != info_.joints.size())
-        {
-            return hardware_interface::return_type::ERROR;
-        }
-        // Example criteria: All joints must have the same command mode
-        if (!std::all_of(new_modes.begin() + 1, new_modes.end(), [&](integration_level_t mode) { return mode == new_modes[0]; }))
-        {
-            return hardware_interface::return_type::ERROR;
-        }
-
-        // Stop motion on all relevant joints that are stopping
-        for (std::string key : stop_interfaces)
-        {
-            for (std::size_t i = 0; i < info_.joints.size(); i++)
-            {
-                if (key.find(info_.joints[i].name) != std::string::npos)
-                {
-                    hw_commands_velocities_[i] = 0;
-                    control_level_[i] = integration_level_t::UNDEFINED; // Revert to undefined
-                }
-            }
-        }
-        // Set the new command modes
-        for (std::size_t i = 0; i < info_.joints.size(); i++)
-        {
-            if (control_level_[i] != integration_level_t::UNDEFINED)
-            {
-                // Something else is using the joint! Abort!
-                return hardware_interface::return_type::ERROR;
-            }
-            control_level_[i] = new_modes[i];
-        }
-        return hardware_interface::return_type::OK;
-    }
-
     hardware_interface::CallbackReturn on_activate(const rclcpp_lifecycle::State &previous_state) override
     {
         RCLCPP_WARN(get_logger(), "on_activate ...");
@@ -146,7 +84,6 @@ class MyHardwareController : public hardware_interface::SystemInterface
         {
             hw_commands_positions_[i] = 0;
             hw_commands_velocities_[i] = 0;
-            control_level_[i] = integration_level_t::UNDEFINED;
         }
         return hardware_interface::CallbackReturn::SUCCESS;
     }
@@ -159,38 +96,42 @@ class MyHardwareController : public hardware_interface::SystemInterface
 
     hardware_interface::return_type read(const rclcpp::Time &time, const rclcpp::Duration &period) override
     {
+        static int count = 0;
+        if (count++ % 200 != 0)
+        {
+            return hardware_interface::return_type::OK;
+        }
+        std::ostringstream ss;
+        ss << "[ " << std::fixed << std::setprecision(3);
         for (std::size_t i = 0; i < hw_states_positions_.size(); i++)
         {
-            //     switch (control_level_[i])
-            //     {
-            //     case integration_level_t::UNDEFINED:
-            //         break;
-            //     case integration_level_t::POSITION:
-            //         hw_states_velocities_[i] = 0;
-            //         hw_states_positions_[i] += (hw_commands_positions_[i] - hw_states_positions_[i]) / hw_slowdown_;
-            //         break;
-            //     case integration_level_t::VELOCITY:
-            //         hw_states_positions_[i] += (hw_states_velocities_[i] * period.seconds()) / hw_slowdown_;
-            //         break;
-            //     default:
-            //         break;
-
-            RCLCPP_WARN(get_logger(), "read. [%d] control_level: %d, pos state: %.2f, pos command: %.2f...", i, control_level_[i], hw_states_positions_[i],
-                         hw_commands_positions_[i]);
+            ss << hw_states_positions_[i] << ", ";
         }
-
+        ss << "] ";
+        RCLCPP_WARN(get_logger(), "read: %s .", ss.str().c_str());
         return hardware_interface::return_type::OK;
     }
 
     hardware_interface::return_type write(const rclcpp::Time &time, const rclcpp::Duration &period) override
     {
+        bool changed = false;
+        std::ostringstream ss;
+        ss << "[ " << std::fixed << std::setprecision(3);
         for (std::size_t i = 0; i < hw_commands_positions_.size(); i++)
         {
-            RCLCPP_WARN(get_logger(), "write. [%d] control_level: %d, pos state: %.2f, pos command: %.2f...", i, control_level_[i], hw_states_positions_[i],
-                         hw_commands_positions_[i]);
+            if (abs(hw_commands_positions_[i] - hw_states_positions_[i]) > 0.001){
+                changed = true;
+            }else{
+                // 当前joint 状态和目标不一致, 需要发送控制指令 
+            }
             hw_states_positions_[i] = hw_commands_positions_[i];
-            hw_states_velocities_[i] = (hw_commands_positions_[i] - hw_states_positions_[i])/10;
+            hw_states_velocities_[i] = (hw_commands_positions_[i] - hw_states_positions_[i]) / 10;
+
+            ss << hw_commands_positions_[i] << ", ";
         }
+        ss << "] ";
+        if(changed)
+            RCLCPP_WARN(get_logger(), "write (%.2f) ==> %s .", period.seconds(), ss.str().c_str());
         return hardware_interface::return_type::OK;
     }
 
@@ -222,19 +163,6 @@ class MyHardwareController : public hardware_interface::SystemInterface
     std::vector<double> hw_commands_velocities_;
     std::vector<double> hw_states_positions_;
     std::vector<double> hw_states_velocities_;
-
-    // Enum defining at which control level we are
-    // Dumb way of maintaining the command_interface type per joint.
-    enum integration_level_t : std::uint8_t
-    {
-        UNDEFINED = 0,
-        POSITION = 1,
-        VELOCITY = 2,
-        ACCELERATION = 3
-    };
-
-    // Active control mode for each actuator
-    std::vector<integration_level_t> control_level_;
 };
 } // namespace my_robot_urdf
 

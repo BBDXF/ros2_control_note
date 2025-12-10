@@ -64,6 +64,12 @@ def generate_launch_description():
         )
     )
 
+    # 4. RQT GUI
+    rqt_joint_trajectory_node = Node(
+        package="rqt_joint_trajectory_controller",
+        executable="rqt_joint_trajectory_controller",
+    )
+
     # 7. 启动所有节点
     return LaunchDescription([
         controller_manager_node,
@@ -72,5 +78,6 @@ def generate_launch_description():
         # joint_state_publisher_gui_node,
         joint_state_broadcaster_spawner,
         rviz_node,
+        rqt_joint_trajectory_node,
         exit_event_handler
     ])
