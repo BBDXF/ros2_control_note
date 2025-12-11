@@ -45,6 +45,13 @@ def generate_launch_description():
         arguments=["arm_group_controller", "--controller-manager", "/controller_manager"],
     )
 
+    # 4. gpio控制器
+    gpio_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["gpio_controller", "--controller-manager", "/controller_manager"],
+    )
+
     # 5. RViz节点
     rviz_node = Node(
         package="rviz2",
@@ -60,6 +67,7 @@ def generate_launch_description():
             on_exit=[
                 Node(package="controller_manager", executable="unspawner", arguments=["arm_group_controller", "--controller-manager", "/controller_manager"]),
                 Node(package="controller_manager", executable="unspawner", arguments=["joint_state_controller", "--controller-manager", "/controller_manager"]),
+                Node(package="controller_manager", executable="unspawner", arguments=["gpio_controller", "--controller-manager", "/controller_manager"]),
             ],
         )
     )
@@ -76,6 +84,7 @@ def generate_launch_description():
         robot_state_publisher_node,
         arm_group_controller_spawner,
         # joint_state_publisher_gui_node,
+        gpio_controller_spawner,
         joint_state_broadcaster_spawner,
         rviz_node,
         rqt_joint_trajectory_node,

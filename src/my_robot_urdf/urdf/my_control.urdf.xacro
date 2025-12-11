@@ -19,15 +19,18 @@
       <state_interface name="velocity" />
     </joint>
     <joint name="joint3">
-      <command_interface name="position" />
+      <command_interface name="position" >
+        <param name="min">-1</param>
+        <param name="max">1</param>
+      </command_interface>
       <state_interface name="position" />
       <state_interface name="velocity" />
     </joint>
 
     <!-- 可选：添加安全接口（GPIO急停/限位，复用之前的配置） -->
-    <!-- <gpio name="gpio_test">
+    <gpio name="gpio_test">
       <state_interface name="emstop_output" />
       <command_interface name="emstop_input" />
-    </gpio> -->
+    </gpio>
   </ros2_control>
 </robot>

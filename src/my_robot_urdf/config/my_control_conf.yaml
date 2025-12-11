@@ -8,6 +8,9 @@ controller_manager:
     arm_group_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+    gpio_controller:
+      type: gpio_controllers/GpioCommandController
+
 arm_group_controller:
   ros__parameters:
     joints:
@@ -27,3 +30,17 @@ arm_group_controller:
     constraints: 0.02
     allow_partial_joints_goal: true
     open_loop_control: true
+
+gpio_controller:
+  ros__parameters:
+    gpios:
+      - gpio_test
+    command_interfaces:
+      gpio_test:
+        - interfaces:
+          - emstop_input
+    state_interfaces:
+      gpio_test:
+        - interfaces:
+          - emstop_output
+

@@ -39,7 +39,11 @@ class MyHardwareController : public hardware_interface::SystemInterface
         hw_commands_positions_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
         hw_commands_velocities_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
 
-        RCLCPP_WARN(get_logger(), "on_init, info_.joints.size() = %d", info_.joints.size());
+        // gpio size = gpio node count * interface count
+        gpio_commands_positions_.resize(info_.gpios.size()*1, std::numeric_limits<double>::quiet_NaN());
+        gpio_states_positions_.resize(info_.gpios.size()*1, std::numeric_limits<double>::quiet_NaN());
+
+        RCLCPP_WARN(get_logger(), "on_init, joints size: %d, gpio size: %d", info_.joints.size(), info_.gpios.size());
 
         return hardware_interface::CallbackReturn::SUCCESS;
     }
@@ -49,9 +53,19 @@ class MyHardwareController : public hardware_interface::SystemInterface
         std::vector<hardware_interface::StateInterface> state_interfaces;
         for (std::size_t i = 0; i < info_.joints.size(); i++)
         {
-            RCLCPP_WARN(get_logger(), "export_state_interfaces, export state: %d, %s", i, info_.joints[i].name.c_str());
+            RCLCPP_WARN(get_logger(), "export_state_interfaces, joint state: %d, %s", i, info_.joints[i].name.c_str());
             state_interfaces.emplace_back(hardware_interface::StateInterface(info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_states_positions_[i]));
             state_interfaces.emplace_back(hardware_interface::StateInterface(info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &hw_states_velocities_[i]));
+        }
+
+        size_t ct = 0;
+        for (size_t i = 0; i < info_.gpios.size(); i++)
+        {
+            for (auto state_if : info_.gpios.at(i).state_interfaces)
+            {
+                state_interfaces.emplace_back(hardware_interface::StateInterface(info_.gpios.at(i).name, state_if.name, &gpio_states_positions_[ct++]));
+                RCLCPP_INFO(get_logger(), "export_state_interfaces, gpio state: %s/%s", info_.gpios.at(i).name.c_str(), state_if.name.c_str());
+            }
         }
 
         return state_interfaces;
@@ -62,9 +76,19 @@ class MyHardwareController : public hardware_interface::SystemInterface
         std::vector<hardware_interface::CommandInterface> command_interfaces;
         for (std::size_t i = 0; i < info_.joints.size(); i++)
         {
-            RCLCPP_WARN(get_logger(), "export_command_interfaces, export command: %d, %s", i, info_.joints[i].name.c_str());
+            RCLCPP_WARN(get_logger(), "export_command_interfaces, joint command: %d, %s", i, info_.joints[i].name.c_str());
             command_interfaces.emplace_back(hardware_interface::CommandInterface(info_.joints[i].name, hardware_interface::HW_IF_POSITION, &hw_commands_positions_[i]));
             command_interfaces.emplace_back(hardware_interface::CommandInterface(info_.joints[i].name, hardware_interface::HW_IF_VELOCITY, &hw_commands_velocities_[i]));
+        }
+
+        size_t ct = 0;
+        for (size_t i = 0; i < info_.gpios.size(); i++)
+        {
+            for (auto command_if : info_.gpios.at(i).command_interfaces)
+            {
+                command_interfaces.emplace_back(hardware_interface::CommandInterface(info_.gpios.at(i).name, command_if.name, &gpio_commands_positions_[ct++]));
+                RCLCPP_INFO(get_logger(), "export_command_interfaces, gpio command: %s/%s", info_.gpios.at(i).name.c_str(), command_if.name.c_str());
+            }
         }
 
         return command_interfaces;
@@ -74,7 +98,7 @@ class MyHardwareController : public hardware_interface::SystemInterface
     {
         RCLCPP_WARN(get_logger(), "on_activate ...");
 
-        // Set some default values
+        // Set default values
         for (std::size_t i = 0; i < hw_states_positions_.size(); i++)
         {
             hw_states_positions_[i] = 0;
@@ -84,6 +108,15 @@ class MyHardwareController : public hardware_interface::SystemInterface
         {
             hw_commands_positions_[i] = 0;
             hw_commands_velocities_[i] = 0;
+        }
+
+        for (std::size_t i = 0; i < gpio_states_positions_.size(); i++)
+        {
+            gpio_states_positions_[i] = 0;
+        }
+        for (std::size_t i = 0; i < gpio_commands_positions_.size(); i++)
+        {
+            gpio_commands_positions_[i] = 0;
         }
         return hardware_interface::CallbackReturn::SUCCESS;
     }
@@ -102,10 +135,16 @@ class MyHardwareController : public hardware_interface::SystemInterface
             return hardware_interface::return_type::OK;
         }
         std::ostringstream ss;
-        ss << "[ " << std::fixed << std::setprecision(3);
+        ss << "joints: [ " << std::fixed << std::setprecision(3);
         for (std::size_t i = 0; i < hw_states_positions_.size(); i++)
         {
             ss << hw_states_positions_[i] << ", ";
+        }
+        ss << "] ";
+        ss << "gpios: [ ";
+        for (std::size_t i = 0; i < gpio_states_positions_.size(); i++)
+        {
+            ss << gpio_states_positions_[i] << ", ";
         }
         ss << "] ";
         RCLCPP_WARN(get_logger(), "read: %s .", ss.str().c_str());
@@ -128,6 +167,18 @@ class MyHardwareController : public hardware_interface::SystemInterface
             hw_states_velocities_[i] = (hw_commands_positions_[i] - hw_states_positions_[i]) / 10;
 
             ss << hw_commands_positions_[i] << ", ";
+        }
+        ss << "] ";
+        ss << "gpios: [ ";
+        for (std::size_t i = 0; i < gpio_commands_positions_.size(); i++)
+        {
+            if (abs(gpio_commands_positions_[i] - gpio_states_positions_[i]) > 0.001){
+                changed = true;
+            }else{
+                // 当前gpio 状态和目标不一致, 需要发送控制指令 
+            }
+            ss << gpio_commands_positions_[i] << ", ";
+            gpio_states_positions_[i] = gpio_commands_positions_[i];
         }
         ss << "] ";
         if(changed)
@@ -163,6 +214,8 @@ class MyHardwareController : public hardware_interface::SystemInterface
     std::vector<double> hw_commands_velocities_;
     std::vector<double> hw_states_positions_;
     std::vector<double> hw_states_velocities_;
+    std::vector<double> gpio_states_positions_;
+    std::vector<double> gpio_commands_positions_;
 };
 } // namespace my_robot_urdf
 
